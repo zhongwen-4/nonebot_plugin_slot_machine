@@ -1,10 +1,10 @@
 from decimal import Decimal
 
-from nonebot import get_driver, on_command
-from nonebot.adapters.milky import Message, MessageSegment
+from nonebot import get_driver
+from nonebot.adapters.milky import MessageSegment
 from nonebot.adapters.milky.event import MessageEvent
-from nonebot.params import CommandArg
 from nonebot.plugin import PluginMetadata
+from nonebot_plugin_alconna import Alconna, Args, CommandMeta, on_alconna
 
 from .algorithm import (
     BetConfigError,
@@ -36,15 +36,36 @@ __plugin_meta__ = PluginMetadata(
     name="slot_machine",
     description="A simple 6x5 slot machine game.",
     usage=(
-        "发送“注册老虎机”领取初始金币；\n"
-        "发送“设置投注 <投注大小> <投注倍数>”保存设置；\n"
-        "发送“老虎机”进行抽奖。"
+        "注册老虎机/注册：领取初始金币\n"
+        "设置投注 <投注大小> <投注倍数>：保存投注设置\n"
+        "老虎机/slot/slots：开始抽奖"
     ),
 )
 
-slot_register = on_command("注册老虎机", aliases={"注册"}, block=True)
-slot_setting = on_command("设置投注", aliases={"setslot"}, block=True)
-slot_machine = on_command("老虎机", aliases={"slot", "slots"}, block=True)
+slot_register = on_alconna(
+    Alconna(
+        "注册老虎机",
+        meta=CommandMeta(description="注册老虎机账号并领取初始金币"),
+    ),
+    aliases={"注册"},
+    block=True,
+)
+slot_setting = on_alconna(
+    Alconna(
+        "设置投注",
+        Args["bet_size", str]["multiplier", int],
+        meta=CommandMeta(description="设置老虎机投注大小和投注倍数"),
+    ),
+    aliases={"setslot"},
+    block=True,
+)
+slot_machine = on_alconna(
+    Alconna(
+        "开始旋转",
+        meta=CommandMeta(description="开始老虎机抽奖"),
+    ),
+    block=True,
+)
 
 
 @get_driver().on_startup
@@ -118,9 +139,10 @@ async def handle_slot_register(event: MessageEvent) -> None:
 
 @slot_setting.handle()
 async def handle_slot_setting(
-    event: MessageEvent, args: Message = CommandArg()
+    event: MessageEvent,
+    bet_size: str,
+    multiplier: int,
 ) -> None:
-    raw_args = args.extract_plain_text().strip()
     account = event.get_user_id()
     user = await get_user(account)
 
@@ -128,7 +150,7 @@ async def handle_slot_setting(
         await slot_setting.finish("你还没有注册。\n请先发送：注册老虎机")
 
     try:
-        bet_config = parse_bet_config(raw_args)
+        bet_config = parse_bet_config(f"{bet_size} {multiplier}")
     except BetConfigError:
         await slot_setting.finish(
             "请输入：设置投注 <投注大小> <投注倍数>，例如：设置投注 0.2 5\n"
