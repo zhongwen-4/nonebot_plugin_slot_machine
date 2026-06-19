@@ -6,7 +6,6 @@ from .constants import (
     ARG_PARTS_COUNT,
     BASE_BET,
     BET_SIZES,
-    CELL_WIDTH,
     COLUMNS,
     MAX_MULTIPLIER,
     MIN_MULTIPLIER,
@@ -53,14 +52,13 @@ class WinMatch:
 class CascadeResult:
     board: list[list[str]]
     highlighted_positions: frozenset[tuple[int, int]]
-    matches: tuple[WinMatch, ...]
     bonus_multiplier: int
     payout: Decimal
 
 
 @dataclass(frozen=True)
 class SpinResult:
-    initial_board: list[list[str]]
+    final_board: list[list[str]]
     cascades: tuple[CascadeResult, ...]
     total_payout: Decimal
 
@@ -117,39 +115,6 @@ def format_bet_summary(bet_config: BetConfig) -> str:
         f"基础投注：{BASE_BET} 点\n"
         f"投注总额：{format_decimal(bet_config.total_bet)} 金币"
     )
-
-
-def format_plain_cell(symbol: str) -> str:
-    return f" {symbol} "
-
-
-def format_highlighted_cell(symbol: str) -> str:
-    return f"[{symbol}]"
-
-
-def format_board(
-    board: list[list[str]],
-    highlighted_positions: set[tuple[int, int]] | frozenset[tuple[int, int]],
-) -> str:
-    header_cells = [
-        f"C{column_index + 1:^{CELL_WIDTH}}"
-        for column_index in range(COLUMNS)
-    ]
-    header = "   " + "".join(header_cells)
-    separator = "  +" + "+".join("-" * CELL_WIDTH for _ in range(COLUMNS)) + "+"
-    lines = [header, separator]
-
-    for row_index, row in enumerate(board, start=1):
-        cells = []
-        for column_index, symbol in enumerate(row):
-            if (row_index - 1, column_index) in highlighted_positions:
-                cells.append(format_highlighted_cell(symbol))
-            else:
-                cells.append(format_plain_cell(symbol))
-        lines.append(f"R{row_index}|" + "|".join(cells) + "|")
-        lines.append(separator)
-
-    return "\n".join(lines)
 
 
 def find_matches(board: list[list[str]]) -> list[WinMatch]:
@@ -229,8 +194,7 @@ def calculate_match_payout(
 
 
 def resolve_spin(bet_config: BetConfig) -> SpinResult:
-    initial_board = generate_board()
-    working_board = [row[:] for row in initial_board]
+    working_board = generate_board()
     cascades: list[CascadeResult] = []
     total_payout = Decimal(0)
     bonus_multiplier = 1
@@ -255,7 +219,6 @@ def resolve_spin(bet_config: BetConfig) -> SpinResult:
             CascadeResult(
                 board=[row[:] for row in working_board],
                 highlighted_positions=frozenset(highlighted_positions),
-                matches=tuple(matches),
                 bonus_multiplier=bonus_multiplier,
                 payout=Decimal(cascade_payout),
             )
@@ -265,56 +228,7 @@ def resolve_spin(bet_config: BetConfig) -> SpinResult:
         bonus_multiplier = min(bonus_multiplier * 2, MAX_BONUS_MULTIPLIER)
 
     return SpinResult(
-        initial_board=initial_board,
+        final_board=[row[:] for row in working_board],
         cascades=tuple(cascades),
         total_payout=total_payout,
     )
-
-
-def format_match_details(matches: tuple[WinMatch, ...], bonus_multiplier: int) -> str:
-    return "，".join(
-        (
-            f"[{match.symbol}] 连中{match.columns}列 "
-            f"{match.payout_points}点 x{bonus_multiplier}"
-        )
-        for match in matches
-    )
-
-
-def format_cascade_summary(cascade_index: int, cascade: CascadeResult) -> str:
-    board_text = format_board(cascade.board, cascade.highlighted_positions)
-    match_text = format_match_details(cascade.matches, cascade.bonus_multiplier)
-    return (
-        f"第 {cascade_index} 轮 x{cascade.bonus_multiplier}\n"
-        f"{board_text}\n"
-        f"命中：{match_text}\n"
-        f"本轮派奖：{format_decimal(cascade.payout)} 金币"
-    )
-
-
-def format_match_list(
-    matches: tuple[WinMatch, ...], bonus_multiplier: int
-) -> list[str]:
-    return [
-        (
-            f"{match.symbol} 连中 {match.columns} 列，"
-            f"赔付 {match.payout_points} 点，倍率 x{bonus_multiplier}"
-        )
-        for match in matches
-    ]
-
-
-def build_board_columns(
-    board: list[list[str]],
-    highlighted_positions: set[tuple[int, int]] | frozenset[tuple[int, int]],
-) -> list[list[dict[str, str | bool]]]:
-    return [
-        [
-            {
-                "symbol": board[row_index][column_index],
-                "highlight": (row_index, column_index) in highlighted_positions,
-            }
-            for row_index in range(ROWS)
-        ]
-        for column_index in range(COLUMNS)
-    ]

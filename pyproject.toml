@@ -7,7 +7,7 @@ requires-python = ">=3.11, <4.0"
 dependencies = [
     "aiosqlite>=0.22.1",
     "nonebot-adapter-milky>=1.2.0",
-    "nonebot-plugin-htmlkit>=0.1.0rc5",
+    "nonebot-plugin-alconna>=0.62.0",
     "nonebot-plugin-localstore>=0.7.4",
     "nonebot2[aiohttp,fastapi]>=2.5.0",
     "pillow>=10.0.0",
@@ -31,7 +31,7 @@ nonebot-adapter-milky = [
 
 [tool.nonebot.plugins]
 "@local" = []
-nonebot-plugin-htmlkit = ["nonebot_plugin_htmlkit"]
+nonebot-plugin-alconna = ["nonebot_plugin_alconna"]
 [tool.ruff]
 line-length = 88
 target-version = "py311"
@@ -102,6 +102,6 @@ keep-runtime-typing = true
 
 [tool.pyright]
 # For Pylance/Pyright configurations, see https://microsoft.github.io/pyright/#/configuration.
-pythonVersion = "3.9"
+pythonVersion = "3.11"
 pythonPlatform = "All"
 typeCheckingMode = "standard"

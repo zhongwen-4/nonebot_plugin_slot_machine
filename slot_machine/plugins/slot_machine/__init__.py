@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from nonebot import get_driver, on_command
 from nonebot.adapters.milky import Message, MessageSegment
 from nonebot.adapters.milky.event import MessageEvent
@@ -6,10 +8,8 @@ from nonebot.plugin import PluginMetadata
 
 from .algorithm import (
     BetConfigError,
-    build_board_columns,
+    CascadeResult,
     format_bet_summary,
-    format_cascade_summary,
-    format_match_list,
     parse_bet_config,
     resolve_spin,
 )
@@ -23,21 +23,22 @@ from .database import (
     upsert_bet_setting,
 )
 from .utils import (
+    GeneratedSpinImage,
     SpinMessageContext,
     build_forward_message,
+    draw_spin_result_image,
     format_decimal,
-    render_spin_result_image,
 )
 
 FORWARD_THRESHOLD = 3
 
 __plugin_meta__ = PluginMetadata(
     name="slot_machine",
-    description="A simple 5x6 slot machine game.",
+    description="A simple 6x5 slot machine game.",
     usage=(
-        '发送 "注册老虎机" 领取初始金币，'
-        '发送 "设置投注 <投注大小> <投注倍数>" 保存设置，'
-        '发送 "老虎机" 进行抽取。'
+        "发送“注册老虎机”领取初始金币；\n"
+        "发送“设置投注 <投注大小> <投注倍数>”保存设置；\n"
+        "发送“老虎机”进行抽奖。"
     ),
 )
 
@@ -52,46 +53,42 @@ async def startup_slot_machine() -> None:
 
 
 async def send_spin_result(event: MessageEvent, context: SpinMessageContext) -> None:
-    latest_cascade = context.latest_cascade
-    summary_image = await render_spin_result_image(
-        context=context,
-        columns=build_board_columns(
-            latest_cascade.board, latest_cascade.highlighted_positions
-        ),
-        matches=format_match_list(
-            latest_cascade.matches, latest_cascade.bonus_multiplier
-        ),
-        current_multiplier=latest_cascade.bonus_multiplier,
-    )
-
-    if len(context.cascade_sections) <= FORWARD_THRESHOLD:
-        await slot_machine.finish(MessageSegment.image(raw=summary_image))
-
-    cascade_images = []
-    for index, cascade in enumerate(context.all_cascades, start=1):
-        cascade_images.append(
-            await render_spin_result_image(
-                context=context,
-                columns=build_board_columns(
-                    cascade.board, cascade.highlighted_positions
-                ),
-                matches=format_match_list(
-                    cascade.matches, cascade.bonus_multiplier
-                ),
-                current_multiplier=cascade.bonus_multiplier,
-                cascades=[context.cascade_sections[index - 1]],
+    images: list[GeneratedSpinImage] = []
+    try:
+        for index, cascade in enumerate(context.all_cascades, start=1):
+            images.append(
+                await draw_spin_result_image(
+                    context=context,
+                    cascade=cascade,
+                    cascade_index=index,
+                )
             )
-        )
 
-    await slot_machine.send(MessageSegment.image(raw=summary_image))
-    await slot_machine.finish(
-        build_forward_message(
-            event,
-            context,
-            summary_image=summary_image,
-            cascade_images=cascade_images,
-        )
+        if len(images) <= FORWARD_THRESHOLD:
+            for image in images[:-1]:
+                await slot_machine.send(MessageSegment.image(raw=image.data))
+            await slot_machine.finish(MessageSegment.image(raw=images[-1].data))
+
+        await slot_machine.finish(build_forward_message(event, context, images))
+    finally:
+        for image in images:
+            image.path.unlink(missing_ok=True)
+
+
+async def send_miss_result(context: SpinMessageContext, board: list[list[str]]) -> None:
+    image = await draw_spin_result_image(
+        context,
+        CascadeResult(
+            board=board,
+            highlighted_positions=frozenset(),
+            bonus_multiplier=1,
+            payout=Decimal(0),
+        ),
     )
+    try:
+        await slot_machine.finish(MessageSegment.image(raw=image.data))
+    finally:
+        image.path.unlink(missing_ok=True)
 
 
 @slot_register.handle()
@@ -169,32 +166,15 @@ async def handle_slot_machine(event: MessageEvent) -> None:
     updated_user = await apply_spin_result(
         account, bet_config.total_bet, spin_result.total_payout
     )
+    context = SpinMessageContext(
+        account=account,
+        total_bet=format_decimal(bet_config.total_bet),
+        total_payout=format_decimal(spin_result.total_payout),
+        remaining_coins=format_decimal(updated_user.coins),
+        all_cascades=list(spin_result.cascades),
+    )
 
     if not spin_result.cascades:
-        await slot_machine.finish(
-            "老虎机结果：\n"
-            f"账号：{account}\n"
-            f"{format_bet_summary(bet_config)}\n"
-            "总派奖：0 金币\n"
-            f"剩余金币：{format_decimal(updated_user.coins)}\n"
-            f"抽奖次数：{updated_user.spin_count}\n\n"
-            "本次未中奖。"
-        )
+        await send_miss_result(context, spin_result.final_board)
 
-    cascade_sections = [
-        format_cascade_summary(index, cascade)
-        for index, cascade in enumerate(spin_result.cascades, start=1)
-    ]
-    await send_spin_result(
-        event,
-        SpinMessageContext(
-            account=account,
-            bet_summary=format_bet_summary(bet_config),
-            total_payout=format_decimal(spin_result.total_payout),
-            remaining_coins=format_decimal(updated_user.coins),
-            spin_count=updated_user.spin_count,
-            cascade_sections=cascade_sections,
-            latest_cascade=spin_result.cascades[-1],
-            all_cascades=list(spin_result.cascades),
-        ),
-    )
+    await send_spin_result(event, context)

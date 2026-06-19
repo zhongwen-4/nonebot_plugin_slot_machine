@@ -111,35 +111,6 @@ async def upsert_bet_setting(account: str, bet_config: BetConfig) -> None:
         await db.commit()
 
 
-async def apply_spin_cost(account: str, total_bet: Decimal) -> UserData:
-    user = await get_user(account)
-    if user is None:
-        msg = "user not registered"
-        raise LookupError(msg)
-
-    remaining_coins = user.coins - total_bet
-    if remaining_coins < 0:
-        msg = "insufficient coins"
-        raise ValueError(msg)
-
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        await db.execute(
-            """
-            UPDATE slot_users
-            SET coins = ?, spin_count = spin_count + 1
-            WHERE account = ?
-            """,
-            (str(remaining_coins), account),
-        )
-        await db.commit()
-
-    return UserData(
-        account=account,
-        coins=remaining_coins,
-        spin_count=user.spin_count + 1,
-    )
-
-
 async def apply_spin_result(
     account: str, total_bet: Decimal, total_payout: Decimal
 ) -> UserData:
