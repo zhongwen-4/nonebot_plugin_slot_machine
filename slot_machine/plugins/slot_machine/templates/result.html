@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      color-scheme: dark;
+      --gold: #f6d27a;
+      --gold-strong: #ffbf3f;
+      --gold-deep: #9c5a06;
+      --red-deep: #4b0707;
+      --red-panel: rgba(80, 14, 14, 0.92);
+      --brown: #260606;
+      --cream: #fff2cb;
+      --line: rgba(255, 225, 148, 0.3);
+      --win: #fff1a6;
+      --wild: #7fe8ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(255, 179, 0, 0.22), transparent 28%),
+        linear-gradient(180deg, #1d0608 0%, #37090c 35%, #180305 100%);
+      color: var(--cream);
+    }
+
+    .frame {
+      width: 1320px;
+      padding: 28px;
+      margin: 0 auto;
+      background:
+        linear-gradient(180deg, rgba(255, 217, 128, 0.16), rgba(61, 8, 8, 0.08)),
+        linear-gradient(180deg, #5f150c 0%, #2d0505 100%);
+      border: 8px solid #9a5b0d;
+      border-radius: 28px;
+      box-shadow:
+        0 0 0 3px rgba(255, 219, 123, 0.55),
+        0 18px 50px rgba(0, 0, 0, 0.45);
+    }
+
+    .title {
+      text-align: center;
+      font-size: 54px;
+      font-weight: 800;
+      letter-spacing: 0;
+      color: #ffe49f;
+      text-shadow:
+        0 2px 0 #6f2800,
+        0 8px 24px rgba(0, 0, 0, 0.45);
+      margin: 4px 0 20px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 18px;
+      margin-bottom: 20px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(117, 18, 18, 0.94), rgba(49, 7, 7, 0.96));
+      border: 3px solid rgba(255, 216, 126, 0.75);
+      border-radius: 18px;
+      box-shadow: inset 0 0 0 2px rgba(255, 234, 171, 0.12);
+      padding: 16px 18px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 16px;
+    }
+
+    .stat {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 8px;
+    }
+
+    .label {
+      font-size: 18px;
+      color: rgba(255, 236, 192, 0.8);
+      margin-bottom: 4px;
+    }
+
+    .value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #fff6d6;
+    }
+
+    .multiplier-box {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 188px;
+      background:
+        radial-gradient(circle at top, rgba(255, 224, 137, 0.28), transparent 55%),
+        linear-gradient(180deg, rgba(255, 193, 92, 0.18), rgba(72, 8, 8, 0.3));
+    }
+
+    .multiplier-title {
+      font-size: 30px;
+      font-weight: 700;
+      color: var(--gold);
+      margin-bottom: 8px;
+    }
+
+    .multiplier-value {
+      font-size: 82px;
+      line-height: 1;
+      font-weight: 900;
+      color: #fff3b8;
+      text-shadow:
+        0 4px 0 #833700,
+        0 10px 25px rgba(0, 0, 0, 0.38);
+    }
+
+    .board-wrap {
+      padding: 18px;
+      background: rgba(19, 2, 2, 0.45);
+      border: 3px solid rgba(255, 215, 126, 0.7);
+      border-radius: 22px;
+      margin-bottom: 20px;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+    }
+
+    .column {
+      display: grid;
+      grid-template-rows: auto repeat(6, 112px);
+      gap: 10px;
+    }
+
+    .column-head {
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 700;
+      color: #ffe99d;
+      background: linear-gradient(180deg, #9f2d12 0%, #66110f 100%);
+      border: 2px solid rgba(255, 216, 126, 0.8);
+      border-radius: 10px;
+      box-shadow: inset 0 0 0 1px rgba(255, 242, 186, 0.15);
+    }
+
+    .cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 18px;
+      border: 3px solid rgba(255, 213, 122, 0.82);
+      background:
+        linear-gradient(180deg, rgba(74, 7, 7, 0.95), rgba(36, 3, 3, 0.96));
+      box-shadow:
+        inset 0 0 20px rgba(255, 198, 92, 0.08),
+        0 8px 16px rgba(0, 0, 0, 0.18);
+      font-size: 58px;
+      font-weight: 900;
+      color: #fff7d9;
+      text-shadow: 0 3px 0 #652400;
+    }
+
+    .cell.highlight {
+      background:
+        radial-gradient(circle at 30% 25%, rgba(255, 245, 175, 0.34), transparent 35%),
+        linear-gradient(180deg, rgba(144, 20, 13, 0.98), rgba(85, 8, 8, 0.98));
+      box-shadow:
+        inset 0 0 18px rgba(255, 242, 159, 0.25),
+        0 0 0 2px rgba(255, 240, 177, 0.18),
+        0 10px 22px rgba(0, 0, 0, 0.24);
+    }
+
+    .cell.wild {
+      color: var(--wild);
+      text-shadow: 0 0 10px rgba(127, 232, 255, 0.46);
+    }
+
+    .sections {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+    }
+
+    .section-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #ffe7a1;
+      margin-bottom: 12px;
+    }
+
+    .match-list,
+    .cascade-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .match-item,
+    .cascade-item {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255, 240, 204, 0.06);
+      border: 1px solid rgba(255, 220, 132, 0.2);
+      font-size: 20px;
+      line-height: 1.45;
+    }
+
+    .footer-note {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255, 228, 158, 0.18);
+      font-size: 18px;
+      color: rgba(255, 240, 213, 0.8);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="title">福星高照</div>
+
+    <div class="topbar">
+      <div class="panel stats">
+        <div class="stat">
+          <div class="label">账号</div>
+          <div class="value">{{ account }}</div>
+        </div>
+        <div class="stat">
+          <div class="label">投注大小</div>
+          <div class="value">{{ bet_size }}</div>
+        </div>
+        <div class="stat">
+          <div class="label">投注倍数</div>
+          <div class="value">{{ bet_multiplier }}</div>
+        </div>
+        <div class="stat">
+          <div class="label">基础投注</div>
+          <div class="value">{{ base_bet }}</div>
+        </div>
+        <div class="stat">
+          <div class="label">投注总额</div>
+          <div class="value">{{ total_bet }}</div>
+        </div>
+        <div class="stat">
+          <div class="label">总派奖</div>
+          <div class="value">{{ total_payout }}</div>
+        </div>
+        <div class="stat">
+          <div class="label">剩余金币</div>
+          <div class="value">{{ remaining_coins }}</div>
+        </div>
+        <div class="stat">
+          <div class="label">抽奖次数</div>
+          <div class="value">{{ spin_count }}</div>
+        </div>
+      </div>
+
+      <div class="panel multiplier-box">
+        <div class="multiplier-title">当前倍率</div>
+        <div class="multiplier-value">x{{ current_multiplier }}</div>
+      </div>
+    </div>
+
+    <div class="board-wrap">
+      <div class="board">
+        {% for column in columns %}
+        <div class="column">
+          <div class="column-head">第{{ loop.index }}列</div>
+          {% for cell in column %}
+          <div class="cell {% if cell.highlight %}highlight{% endif %} {% if cell.symbol == 'W' %}wild{% endif %}">
+            {{ cell.symbol }}
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="sections">
+      <div class="panel">
+        <div class="section-title">本轮命中</div>
+        <div class="match-list">
+          {% if matches %}
+            {% for match in matches %}
+            <div class="match-item">{{ match }}</div>
+            {% endfor %}
+          {% else %}
+            <div class="match-item">本次未中奖</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="section-title">连消记录</div>
+        <div class="cascade-list">
+          {% if cascades %}
+            {% for item in cascades %}
+            <div class="cascade-item">{{ item }}</div>
+            {% endfor %}
+          {% else %}
+            <div class="cascade-item">没有触发连消</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-note">
+      同一符号从第一列开始连续命中三列、四列、五列即可派奖。W 为百搭符号，每列只占一个替代位。
+      每轮中奖后消除并补新符号，奖金倍数翻倍，最高 x1024。
+    </div>
+  </div>
+</body>
+</html>
