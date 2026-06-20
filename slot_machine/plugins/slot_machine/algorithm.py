@@ -155,6 +155,9 @@ def find_column_hit(
         if board[row_index][column_index] == symbol:
             return (row_index, column_index)
 
+    if column_index == 0:
+        return None
+
     for row_index in range(ROWS):
         if board[row_index][column_index] == WILD_SYMBOL:
             return (row_index, column_index)
