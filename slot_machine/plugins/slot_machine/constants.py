@@ -10,18 +10,19 @@ import nonebot_plugin_localstore as store
 
 ROWS: Final[int] = 5
 COLUMNS: Final[int] = 6
-PAYLINE_COLUMNS: Final[int] = 3
-ARG_PARTS_COUNT: Final[int] = 2
 BASE_BET: Final[int] = 10
 WILD_SYMBOL: Final[str] = "W"
 SYMBOLS: Final[tuple[str, ...]] = ("A", "B", "C", "D", "E", "F", "G", "H", WILD_SYMBOL)
-BET_SIZES: Final[tuple[Decimal, ...]] = (
-    Decimal("0.02"),
-    Decimal("0.2"),
-    Decimal(1),
-)
-MIN_MULTIPLIER: Final[int] = 1
-MAX_MULTIPLIER: Final[int] = 10
+PAYOUT_TABLE: Final[dict[str, dict[int, int]]] = {
+    "A": {3: 50, 4: 100, 5: 150},
+    "B": {3: 30, 4: 60, 5: 100},
+    "C": {3: 20, 4: 40, 5: 80},
+    "D": {3: 20, 4: 40, 5: 80},
+    "E": {3: 10, 4: 25, 5: 60},
+    "F": {3: 10, 4: 25, 5: 60},
+    "G": {3: 8, 4: 15, 5: 30},
+    "H": {3: 8, 4: 15, 5: 30},
+}
 REGISTRATION_REWARD: Final[Decimal] = Decimal(100)
 DATABASE_PATH = store.get_plugin_data_file("slot_machine.db")
 BASE_IMAGE_PATH: Final[Path] = Path(__file__).resolve().parent / "image" / "image.png"

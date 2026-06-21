@@ -1,32 +1,16 @@
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from random import choice
+from random import choice, random
 
 from .constants import (
-    ARG_PARTS_COUNT,
     BASE_BET,
-    BET_SIZES,
     COLUMNS,
-    MAX_MULTIPLIER,
-    MIN_MULTIPLIER,
-    PAYLINE_COLUMNS,
+    PAYOUT_TABLE,
     ROWS,
     SYMBOLS,
     WILD_SYMBOL,
 )
 from .utils import format_decimal
-
-PAYOUT_TABLE = {
-    "A": {3: 50, 4: 100, 5: 150},
-    "B": {3: 30, 4: 60, 5: 100},
-    "C": {3: 20, 4: 40, 5: 80},
-    "D": {3: 20, 4: 40, 5: 80},
-    "E": {3: 10, 4: 25, 5: 60},
-    "F": {3: 10, 4: 25, 5: 60},
-    "G": {3: 8, 4: 15, 5: 30},
-    "H": {3: 8, 4: 15, 5: 30},
-}
-MAX_BONUS_MULTIPLIER = 1024
 
 
 class BetConfigError(ValueError):
@@ -67,6 +51,26 @@ def generate_board() -> list[list[str]]:
     return [[choice(SYMBOLS) for _ in range(COLUMNS)] for _ in range(ROWS)]
 
 
+def generate_losing_board() -> list[list[str]]:
+    for _ in range(100):
+        board = generate_board()
+        if not find_matches(board):
+            return board
+
+    return build_fixed_losing_board()
+
+
+def build_fixed_losing_board() -> list[list[str]]:
+    base_symbols = ("A", "B", "C", "D", "E", "F", "G", "H")
+    return [
+        [
+            base_symbols[(row_index + column_index) % len(base_symbols)]
+            for column_index in range(COLUMNS)
+        ]
+        for row_index in range(ROWS)
+    ]
+
+
 def calculate_total_bet(bet_size: Decimal, multiplier: int) -> Decimal:
     return bet_size * Decimal(multiplier) * Decimal(BASE_BET)
 
@@ -77,7 +81,7 @@ def parse_bet_size(raw_value: str) -> Decimal:
     except InvalidOperation as exc:
         raise BetConfigError from exc
 
-    if bet_size not in BET_SIZES:
+    if bet_size not in (Decimal("0.02"), Decimal("0.2"), Decimal(1)):
         raise BetConfigError
     return bet_size
 
@@ -88,14 +92,14 @@ def parse_multiplier(raw_value: str) -> int:
     except ValueError as exc:
         raise BetConfigError from exc
 
-    if not MIN_MULTIPLIER <= multiplier <= MAX_MULTIPLIER:
+    if not 1 <= multiplier <= 10:  # noqa: PLR2004
         raise BetConfigError
     return multiplier
 
 
 def parse_bet_config(raw_args: str) -> BetConfig:
     parts = raw_args.split()
-    if len(parts) != ARG_PARTS_COUNT:
+    if len(parts) != 2:  # noqa: PLR2004
         raise BetConfigError
 
     bet_size = parse_bet_size(parts[0])
@@ -134,7 +138,7 @@ def find_matches(board: list[list[str]]) -> list[WinMatch]:
             matched_columns += 1
             hit_positions.append(column_hit)
 
-        if matched_columns >= PAYLINE_COLUMNS:
+        if matched_columns >= 3:  # noqa: PLR2004
             payout_columns = min(matched_columns, max(PAYOUT_TABLE[symbol]))
             matches.append(
                 WinMatch(
@@ -228,10 +232,62 @@ def resolve_spin(bet_config: BetConfig) -> SpinResult:
         )
 
         working_board = collapse_board(working_board, highlighted_positions)
-        bonus_multiplier = min(bonus_multiplier * 2, MAX_BONUS_MULTIPLIER)
+        bonus_multiplier = min(bonus_multiplier * 2, 1024)
 
     return SpinResult(
         final_board=[row[:] for row in working_board],
         cascades=tuple(cascades),
         total_payout=total_payout,
     )
+
+
+def resolve_controlled_spin(
+    bet_config: BetConfig,
+    user_coins: Decimal,
+    win_count: int,
+    total_user_payout: Decimal,
+) -> SpinResult:
+    spin_result = resolve_spin(bet_config)
+    if not spin_result.cascades:
+        return spin_result
+
+    if random() <= calculate_allowed_win_probability(
+        user_coins,
+        win_count,
+        total_user_payout,
+    ):
+        return spin_result
+
+    losing_board = generate_losing_board()
+    return SpinResult(
+        final_board=losing_board,
+        cascades=(),
+        total_payout=Decimal(0),
+    )
+
+
+def calculate_allowed_win_probability(
+    user_coins: Decimal,
+    win_count: int,
+    total_user_payout: Decimal,
+) -> float:
+    if user_coins >= Decimal(10000):
+        return 0.0
+    if win_count >= 50:  # noqa: PLR2004
+        return 0.0
+    if total_user_payout >= Decimal(5000):
+        return 0.0
+
+    if user_coins >= Decimal(5000):
+        base_probability = 0.02
+    elif user_coins >= Decimal(1000):
+        base_probability = 0.08
+    elif user_coins >= Decimal(300):
+        base_probability = 0.18
+    else:
+        base_probability = 0.35
+
+    win_penalty = 0.82 ** min(win_count, 30)
+    payout_ratio = min(float(total_user_payout / Decimal(2000)), 0.95)
+    payout_penalty = max(0.05, 1 - payout_ratio)
+    return max(0.0, min(base_probability * win_penalty * payout_penalty, 1.0))

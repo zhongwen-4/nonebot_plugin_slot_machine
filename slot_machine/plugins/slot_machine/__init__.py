@@ -11,7 +11,7 @@ from .algorithm import (
     CascadeResult,
     format_bet_summary,
     parse_bet_config,
-    resolve_spin,
+    resolve_controlled_spin,
 )
 from .constants import REGISTRATION_REWARD
 from .database import (
@@ -30,15 +30,14 @@ from .utils import (
     format_decimal,
 )
 
-FORWARD_THRESHOLD = 3
-
 __plugin_meta__ = PluginMetadata(
     name="slot_machine",
     description="A simple 6x5 slot machine game.",
     usage=(
         "注册老虎机/注册：领取初始金币\n"
         "设置投注 <投注大小> <投注倍数>：保存投注设置\n"
-        "老虎机/slot/slots：开始抽奖"
+        "查询老虎机/查询：查看账号和投注信息\n"
+        "开始旋转：开始抽奖"
     ),
 )
 
@@ -57,6 +56,14 @@ slot_setting = on_alconna(
         meta=CommandMeta(description="设置老虎机投注大小和投注倍数"),
     ),
     aliases={"setslot"},
+    block=True,
+)
+slot_query = on_alconna(
+    Alconna(
+        "查询老虎机",
+        meta=CommandMeta(description="查询老虎机账号、金币和投注设置"),
+    ),
+    aliases={"查询"},
     block=True,
 )
 slot_machine = on_alconna(
@@ -85,7 +92,7 @@ async def send_spin_result(event: MessageEvent, context: SpinMessageContext) -> 
                 )
             )
 
-        if len(images) <= FORWARD_THRESHOLD:
+        if len(images) <= 3:  # noqa: PLR2004
             for image in images[:-1]:
                 await slot_machine.send(MessageSegment.image(raw=image.data))
             await slot_machine.finish(MessageSegment.image(raw=images[-1].data))
@@ -161,6 +168,31 @@ async def handle_slot_setting(
     await slot_setting.finish(f"已保存你的投注设置。\n{format_bet_summary(bet_config)}")
 
 
+@slot_query.handle()
+async def handle_slot_query(event: MessageEvent) -> None:
+    account = event.get_user_id()
+    user = await get_user(account)
+
+    if user is None:
+        await slot_query.finish("你还没有注册。\n请先发送：注册老虎机")
+
+    bet_config = await get_bet_setting(account)
+    bet_text = (
+        format_bet_summary(bet_config)
+        if bet_config is not None
+        else "尚未设置投注"
+    )
+    await slot_query.finish(
+        "老虎机账号信息\n"
+        f"账号：{account}\n"
+        f"当前金币：{format_decimal(user.coins)}\n"
+        f"抽奖次数：{user.spin_count}\n"
+        f"中奖次数：{user.win_count}\n"
+        f"累计获得：{format_decimal(user.total_payout)} 金币\n\n"
+        f"当前投注：\n{bet_text}"
+    )
+
+
 @slot_machine.handle()
 async def handle_slot_machine(event: MessageEvent) -> None:
     account = event.get_user_id()
@@ -184,7 +216,12 @@ async def handle_slot_machine(event: MessageEvent) -> None:
             f"本次需要：{format_decimal(bet_config.total_bet)}"
         )
 
-    spin_result = resolve_spin(bet_config)
+    spin_result = resolve_controlled_spin(
+        bet_config,
+        user.coins,
+        user.win_count,
+        user.total_payout,
+    )
     updated_user = await apply_spin_result(
         account, bet_config.total_bet, spin_result.total_payout
     )

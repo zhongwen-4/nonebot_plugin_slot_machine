@@ -12,6 +12,8 @@ class UserData:
     account: str
     coins: Decimal
     spin_count: int
+    win_count: int
+    total_payout: Decimal
 
 
 async def initialize_database() -> None:
@@ -30,11 +32,29 @@ async def initialize_database() -> None:
             CREATE TABLE IF NOT EXISTS slot_users (
                 account TEXT PRIMARY KEY,
                 coins TEXT NOT NULL,
-                spin_count INTEGER NOT NULL DEFAULT 0
+                spin_count INTEGER NOT NULL DEFAULT 0,
+                win_count INTEGER NOT NULL DEFAULT 0,
+                total_payout TEXT NOT NULL DEFAULT '0'
             )
             """
         )
+        await ensure_user_stats_columns(db)
         await db.commit()
+
+
+async def ensure_user_stats_columns(db: aiosqlite.Connection) -> None:
+    columns = {
+        row[1]
+        for row in await db.execute_fetchall("PRAGMA table_info(slot_users)")
+    }
+    if "win_count" not in columns:
+        await db.execute(
+            "ALTER TABLE slot_users ADD COLUMN win_count INTEGER NOT NULL DEFAULT 0"
+        )
+    if "total_payout" not in columns:
+        await db.execute(
+            "ALTER TABLE slot_users ADD COLUMN total_payout TEXT NOT NULL DEFAULT '0'"
+        )
 
 
 async def register_user(account: str) -> bool:
@@ -55,7 +75,7 @@ async def get_user(account: str) -> UserData | None:
         aiosqlite.connect(DATABASE_PATH) as db,
         db.execute(
             """
-            SELECT account, coins, spin_count
+            SELECT account, coins, spin_count, win_count, total_payout
             FROM slot_users
             WHERE account = ?
             """,
@@ -67,7 +87,13 @@ async def get_user(account: str) -> UserData | None:
     if row is None:
         return None
 
-    return UserData(account=row[0], coins=Decimal(row[1]), spin_count=row[2])
+    return UserData(
+        account=row[0],
+        coins=Decimal(row[1]),
+        spin_count=row[2],
+        win_count=row[3],
+        total_payout=Decimal(row[4]),
+    )
 
 
 async def get_bet_setting(account: str) -> BetConfig | None:
@@ -125,15 +151,21 @@ async def apply_spin_result(
         raise ValueError(msg)
 
     final_coins = remaining_coins + total_payout
+    win_increment = int(total_payout > 0)
+    updated_total_payout = user.total_payout + total_payout
 
     async with aiosqlite.connect(DATABASE_PATH) as db:
         await db.execute(
             """
             UPDATE slot_users
-            SET coins = ?, spin_count = spin_count + 1
+            SET
+                coins = ?,
+                spin_count = spin_count + 1,
+                win_count = win_count + ?,
+                total_payout = ?
             WHERE account = ?
             """,
-            (str(final_coins), account),
+            (str(final_coins), win_increment, str(updated_total_payout), account),
         )
         await db.commit()
 
@@ -141,4 +173,6 @@ async def apply_spin_result(
         account=account,
         coins=final_coins,
         spin_count=user.spin_count + 1,
+        win_count=user.win_count + win_increment,
+        total_payout=updated_total_payout,
     )
