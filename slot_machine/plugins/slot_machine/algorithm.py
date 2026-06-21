@@ -428,6 +428,8 @@ def calculate_allowed_win_probability(
         base_probability = 0.08
     elif user_coins >= Decimal(300):
         base_probability = 0.18
+    elif user_coins >= Decimal(100):
+        base_probability = 0.4
     else:
         base_probability = 0.35
 
