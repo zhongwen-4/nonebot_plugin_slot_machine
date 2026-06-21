@@ -1,3 +1,4 @@
+import asyncio
 from decimal import Decimal
 
 from nonebot import get_driver
@@ -83,14 +84,18 @@ async def startup_slot_machine() -> None:
 async def send_spin_result(event: MessageEvent, context: SpinMessageContext) -> None:
     images: list[GeneratedSpinImage] = []
     try:
-        for index, cascade in enumerate(context.all_cascades, start=1):
-            images.append(
-                await draw_spin_result_image(
-                    context=context,
-                    cascade=cascade,
-                    cascade_index=index,
+        images = list(
+            await asyncio.gather(
+                *(
+                    draw_spin_result_image(
+                        context=context,
+                        cascade=cascade,
+                        cascade_index=index,
+                    )
+                    for index, cascade in enumerate(context.all_cascades, start=1)
                 )
             )
+        )
 
         if len(images) <= 3:  # noqa: PLR2004
             for image in images[:-1]:

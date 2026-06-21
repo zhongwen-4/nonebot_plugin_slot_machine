@@ -20,6 +20,7 @@ from .constants import (
     GRID_LEFT,
     GRID_TOP,
     ROWS,
+    TREASURE_SYMBOL,
     WILD_SYMBOL,
 )
 
@@ -81,9 +82,9 @@ def build_forward_message(
                 f"账号：{context.account}",
                 f"总派彩：{context.total_payout} 金币",
                 f"剩余金币：{context.remaining_coins}",
-                f"连消轮数：{len(images)}",
+                f"记录数量：{len(images)}",
             ],
-            summary=f"共 {len(images)} 轮连消",
+            summary=f"共 {len(images)} 条记录",
             prompt="点击查看老虎机中奖详情",
         )
     )
@@ -99,7 +100,7 @@ async def draw_spin_result_image(
     draw = ImageDraw.Draw(image)
     overlay_draw = ImageDraw.Draw(overlay)
     symbol_font = load_font(54)
-    wild_font = load_font(46)
+    special_font = load_font(46)
     info_font = load_multiplier_font(44)
     footer_font = load_multiplier_font(20)
 
@@ -113,7 +114,11 @@ async def draw_spin_result_image(
                 draw,
                 box,
                 symbol,
-                wild_font if symbol == WILD_SYMBOL else symbol_font,
+                (
+                    special_font
+                    if symbol in (WILD_SYMBOL, TREASURE_SYMBOL)
+                    else symbol_font
+                ),
                 highlighted=highlighted,
             )
 
@@ -203,7 +208,7 @@ def draw_symbol(
     text_height = text_box[3] - text_box[1]
     x = left + (right - left - text_width) / 2
     y = top + (bottom - top - text_height) / 2 - 5
-    fill = (80, 235, 255) if symbol == WILD_SYMBOL else (255, 235, 128)
+    fill = get_symbol_fill(symbol)
     stroke = (95, 20, 0) if highlighted else (25, 0, 0)
     draw.text(
         (x, y),
@@ -213,6 +218,14 @@ def draw_symbol(
         stroke_width=3,
         stroke_fill=stroke,
     )
+
+
+def get_symbol_fill(symbol: str) -> tuple[int, int, int]:
+    if symbol == WILD_SYMBOL:
+        return (80, 235, 255)
+    if symbol == TREASURE_SYMBOL:
+        return (110, 255, 130)
+    return (255, 235, 128)
 
 
 def draw_header(
@@ -240,6 +253,11 @@ def draw_footer(
         f"本次中奖：{format_decimal(cascade.payout)} 金币  "
         f"总共获得：{context.total_payout} 金币"
     )
+    if cascade.awarded_free_spins:
+        text = f"{text}  免费抽奖：+{cascade.awarded_free_spins} 次"
+    if cascade.free_spin_index is not None:
+        text = f"免费第 {cascade.free_spin_index} 次  {text}"
+
     draw.text(
         (458, 733),
         text,

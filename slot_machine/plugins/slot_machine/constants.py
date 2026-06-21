@@ -12,7 +12,19 @@ ROWS: Final[int] = 5
 COLUMNS: Final[int] = 6
 BASE_BET: Final[int] = 10
 WILD_SYMBOL: Final[str] = "W"
-SYMBOLS: Final[tuple[str, ...]] = ("A", "B", "C", "D", "E", "F", "G", "H", WILD_SYMBOL)
+TREASURE_SYMBOL: Final[str] = "S"
+SYMBOLS: Final[tuple[str, ...]] = (
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "H",
+    WILD_SYMBOL,
+    TREASURE_SYMBOL,
+)
 PAYOUT_TABLE: Final[dict[str, dict[int, int]]] = {
     "A": {3: 50, 4: 100, 5: 150},
     "B": {3: 30, 4: 60, 5: 100},

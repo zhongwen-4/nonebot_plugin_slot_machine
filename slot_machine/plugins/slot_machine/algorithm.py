@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from random import choice, random
+from random import choices, random
 
 from .constants import (
     BASE_BET,
@@ -8,6 +8,7 @@ from .constants import (
     PAYOUT_TABLE,
     ROWS,
     SYMBOLS,
+    TREASURE_SYMBOL,
     WILD_SYMBOL,
 )
 from .utils import format_decimal
@@ -38,6 +39,8 @@ class CascadeResult:
     highlighted_positions: frozenset[tuple[int, int]]
     bonus_multiplier: int
     payout: Decimal
+    free_spin_index: int | None = None
+    awarded_free_spins: int = 0
 
 
 @dataclass(frozen=True)
@@ -45,16 +48,47 @@ class SpinResult:
     final_board: list[list[str]]
     cascades: tuple[CascadeResult, ...]
     total_payout: Decimal
+    awarded_free_spins: int
 
 
 def generate_board() -> list[list[str]]:
-    return [[choice(SYMBOLS) for _ in range(COLUMNS)] for _ in range(ROWS)]
+    columns = [generate_column_symbols(ROWS) for _ in range(COLUMNS)]
+    return [
+        [columns[column_index][row_index] for column_index in range(COLUMNS)]
+        for row_index in range(ROWS)
+    ]
+
+
+def generate_column_symbols(count: int, *, has_treasure: bool = False) -> list[str]:
+    symbols: list[str] = []
+    treasure_generated = has_treasure
+    for _ in range(count):
+        symbol = generate_symbol(allow_treasure=not treasure_generated)
+        if symbol == TREASURE_SYMBOL:
+            treasure_generated = True
+        symbols.append(symbol)
+    return symbols
+
+
+def generate_symbol(*, allow_treasure: bool = True) -> str:
+    if not allow_treasure:
+        return choices(
+            ("A", "B", "C", "D", "E", "F", "G", "H", WILD_SYMBOL),
+            weights=(18, 18, 18, 18, 18, 18, 18, 18, 4),
+            k=1,
+        )[0]
+
+    return choices(
+        ("A", "B", "C", "D", "E", "F", "G", "H", WILD_SYMBOL, TREASURE_SYMBOL),
+        weights=(18, 18, 18, 18, 18, 18, 18, 18, 4, 1),
+        k=1,
+    )[0]
 
 
 def generate_losing_board() -> list[list[str]]:
     for _ in range(100):
         board = generate_board()
-        if not find_matches(board):
+        if not find_matches(board) and not calculate_awarded_free_spins(board):
             return board
 
     return build_fixed_losing_board()
@@ -73,6 +107,26 @@ def build_fixed_losing_board() -> list[list[str]]:
 
 def calculate_total_bet(bet_size: Decimal, multiplier: int) -> Decimal:
     return bet_size * Decimal(multiplier) * Decimal(BASE_BET)
+
+
+def count_treasure_symbols(board: list[list[str]]) -> int:
+    return sum(symbol == TREASURE_SYMBOL for row in board for symbol in row)
+
+
+def calculate_awarded_free_spins(board: list[list[str]]) -> int:
+    treasure_count = count_treasure_symbols(board)
+    if treasure_count < 3:  # noqa: PLR2004
+        return 0
+    return (treasure_count - 2) * 10
+
+
+def find_treasure_positions(board: list[list[str]]) -> set[tuple[int, int]]:
+    return {
+        (row_index, column_index)
+        for row_index, row in enumerate(board)
+        for column_index, symbol in enumerate(row)
+        if symbol == TREASURE_SYMBOL
+    }
 
 
 def parse_bet_size(raw_value: str) -> Decimal:
@@ -125,7 +179,7 @@ def find_matches(board: list[list[str]]) -> list[WinMatch]:
     matches: list[WinMatch] = []
 
     for symbol in SYMBOLS:
-        if symbol == WILD_SYMBOL:
+        if symbol in (WILD_SYMBOL, TREASURE_SYMBOL):
             continue
 
         matched_columns = 0
@@ -181,7 +235,13 @@ def collapse_board(
             if (row_index, column_index) not in positions_to_remove
         ]
         refill_count = ROWS - len(survivors)
-        columns.append([choice(SYMBOLS) for _ in range(refill_count)] + survivors)
+        columns.append(
+            generate_column_symbols(
+                refill_count,
+                has_treasure=TREASURE_SYMBOL in survivors,
+            )
+            + survivors
+        )
 
     return [
         [columns[column_index][row_index] for column_index in range(COLUMNS)]
@@ -201,21 +261,76 @@ def calculate_match_payout(
 
 
 def resolve_spin(bet_config: BetConfig) -> SpinResult:
-    working_board = generate_board()
+    spin_result = resolve_spin_from_board(
+        bet_config,
+        generate_board(),
+        bonus_multiplier=1,
+        free_spin_index=None,
+    )
+    if spin_result.awarded_free_spins == 0:
+        return spin_result
+
+    free_spin_result = resolve_free_spins(
+        bet_config,
+        spin_result.awarded_free_spins,
+    )
+    return SpinResult(
+        final_board=free_spin_result.final_board,
+        cascades=spin_result.cascades + free_spin_result.cascades,
+        total_payout=spin_result.total_payout + free_spin_result.total_payout,
+        awarded_free_spins=(
+            spin_result.awarded_free_spins
+            + free_spin_result.awarded_free_spins
+        ),
+    )
+
+
+def resolve_spin_from_board(
+    bet_config: BetConfig,
+    board: list[list[str]],
+    bonus_multiplier: int,
+    free_spin_index: int | None,
+) -> SpinResult:
+    working_board = [row[:] for row in board]
     cascades: list[CascadeResult] = []
     total_payout = Decimal(0)
-    bonus_multiplier = 1
+    total_awarded_free_spins = calculate_awarded_free_spins(working_board)
+    treasure_positions = (
+        find_treasure_positions(working_board)
+        if total_awarded_free_spins
+        else set()
+    )
+    first_record = True
 
     while True:
         matches = find_matches(working_board)
         if not matches:
+            if (
+                (total_awarded_free_spins and first_record)
+                or free_spin_index is not None
+            ):
+                cascades.append(
+                    CascadeResult(
+                        board=[row[:] for row in working_board],
+                        highlighted_positions=frozenset(treasure_positions),
+                        bonus_multiplier=bonus_multiplier,
+                        payout=Decimal(0),
+                        free_spin_index=free_spin_index,
+                        awarded_free_spins=(
+                            total_awarded_free_spins if first_record else 0
+                        ),
+                    )
+                )
             break
 
-        highlighted_positions = {
+        matched_positions = {
             position
             for match in matches
             for position in match.hit_positions
         }
+        highlighted_positions = set(matched_positions)
+        if first_record and total_awarded_free_spins:
+            highlighted_positions.update(find_treasure_positions(working_board))
         cascade_payout = sum(
             calculate_match_payout(bet_config, match.payout_points, bonus_multiplier)
             for match in matches
@@ -228,16 +343,48 @@ def resolve_spin(bet_config: BetConfig) -> SpinResult:
                 highlighted_positions=frozenset(highlighted_positions),
                 bonus_multiplier=bonus_multiplier,
                 payout=Decimal(cascade_payout),
+                free_spin_index=free_spin_index,
+                awarded_free_spins=total_awarded_free_spins if first_record else 0,
             )
         )
 
-        working_board = collapse_board(working_board, highlighted_positions)
+        working_board = collapse_board(working_board, matched_positions)
         bonus_multiplier = min(bonus_multiplier * 2, 1024)
+        first_record = False
 
     return SpinResult(
         final_board=[row[:] for row in working_board],
         cascades=tuple(cascades),
         total_payout=total_payout,
+        awarded_free_spins=total_awarded_free_spins,
+    )
+
+
+def resolve_free_spins(bet_config: BetConfig, free_spin_count: int) -> SpinResult:
+    cascades: list[CascadeResult] = []
+    total_payout = Decimal(0)
+    total_awarded_free_spins = 0
+    free_spin_index = 1
+
+    while free_spin_index <= free_spin_count:
+        free_spin_result = resolve_spin_from_board(
+            bet_config,
+            generate_board(),
+            bonus_multiplier=8,
+            free_spin_index=free_spin_index,
+        )
+        cascades.extend(free_spin_result.cascades)
+        total_payout += free_spin_result.total_payout
+        total_awarded_free_spins += free_spin_result.awarded_free_spins
+        free_spin_count += free_spin_result.awarded_free_spins
+        final_board = free_spin_result.final_board
+        free_spin_index += 1
+
+    return SpinResult(
+        final_board=final_board if free_spin_count else generate_losing_board(),
+        cascades=tuple(cascades),
+        total_payout=total_payout,
+        awarded_free_spins=total_awarded_free_spins,
     )
 
 
@@ -247,23 +394,20 @@ def resolve_controlled_spin(
     win_count: int,
     total_user_payout: Decimal,
 ) -> SpinResult:
-    spin_result = resolve_spin(bet_config)
-    if not spin_result.cascades:
-        return spin_result
-
-    if random() <= calculate_allowed_win_probability(
+    if random() > calculate_allowed_win_probability(
         user_coins,
         win_count,
         total_user_payout,
     ):
-        return spin_result
+        losing_board = generate_losing_board()
+        return SpinResult(
+            final_board=losing_board,
+            cascades=(),
+            total_payout=Decimal(0),
+            awarded_free_spins=0,
+        )
 
-    losing_board = generate_losing_board()
-    return SpinResult(
-        final_board=losing_board,
-        cascades=(),
-        total_payout=Decimal(0),
-    )
+    return resolve_spin(bet_config)
 
 
 def calculate_allowed_win_probability(
