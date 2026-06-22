@@ -1,7 +1,8 @@
 import asyncio
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
-from nonebot import get_driver
+from nonebot import get_driver, load_plugins, logger, on_command
 from nonebot.adapters.milky import MessageSegment
 from nonebot.adapters.milky.event import MessageEvent
 from nonebot.plugin import PluginMetadata
@@ -10,6 +11,7 @@ from nonebot_plugin_alconna import Alconna, Args, CommandMeta, on_alconna
 from .algorithm import (
     BetConfigError,
     CascadeResult,
+    calculate_allowed_win_probability,
     format_bet_summary,
     parse_bet_config,
     resolve_controlled_spin,
@@ -21,6 +23,7 @@ from .database import (
     get_user,
     initialize_database,
     register_user,
+    transfer_user_coins,
     upsert_bet_setting,
 )
 from .utils import (
@@ -42,11 +45,10 @@ __plugin_meta__ = PluginMetadata(
     ),
 )
 
-slot_register = on_alconna(
-    Alconna(
-        "注册老虎机",
-        meta=CommandMeta(description="注册老虎机账号并领取初始金币"),
-    ),
+load_plugins(str(Path(__file__).parent / "plugins"))
+
+slot_register = on_command(
+    "注册老虎机",
     aliases={"注册"},
     block=True,
 )
@@ -59,22 +61,23 @@ slot_setting = on_alconna(
     aliases={"setslot"},
     block=True,
 )
-slot_query = on_alconna(
+slot_transfer = on_alconna(
     Alconna(
-        "查询老虎机",
-        meta=CommandMeta(description="查询老虎机账号、金币和投注设置"),
+        "转账",
+        Args["receiver_account", str]["amount", str],
+        meta=CommandMeta(description="向其他老虎机账号转账金币"),
     ),
+    block=True,
+)
+slot_query = on_command(
+    "查询老虎机",
     aliases={"查询"},
     block=True,
 )
-slot_machine = on_alconna(
-    Alconna(
-        "开始旋转",
-        meta=CommandMeta(description="开始老虎机抽奖"),
-    ),
+slot_machine = on_command(
+    "开始旋转",
     block=True,
 )
-
 
 @get_driver().on_startup
 async def startup_slot_machine() -> None:
@@ -173,6 +176,53 @@ async def handle_slot_setting(
     await slot_setting.finish(f"已保存你的投注设置。\n{format_bet_summary(bet_config)}")
 
 
+@slot_transfer.handle()
+async def handle_slot_transfer(
+    event: MessageEvent,
+    receiver_account: str,
+    amount: str,
+) -> None:
+    sender_account = event.get_user_id()
+    sender = await get_user(sender_account)
+    if sender is None:
+        await slot_transfer.finish("你还没有注册。\n请先发送：注册老虎机")
+
+    try:
+        transfer_amount = Decimal(amount)
+    except InvalidOperation:
+        await slot_transfer.finish("请输入正确金额，例如：转账 123456 10")
+
+    if transfer_amount <= 0:
+        await slot_transfer.finish("转账金额必须大于 0。")
+
+    receiver = await get_user(receiver_account)
+    if receiver is None:
+        await slot_transfer.finish("对方还没有注册老虎机账号。")
+
+    if sender_account == receiver_account:
+        await slot_transfer.finish("不能给自己转账。")
+
+    if sender.coins < transfer_amount:
+        await slot_transfer.finish(
+            "金币不足，无法转账。\n"
+            f"当前金币：{format_decimal(sender.coins)}\n"
+            f"转账金额：{format_decimal(transfer_amount)}"
+        )
+
+    updated_sender, updated_receiver = await transfer_user_coins(
+        sender_account,
+        receiver_account,
+        transfer_amount,
+    )
+    await slot_transfer.finish(
+        "转账成功。\n"
+        f"收款账号：{receiver_account}\n"
+        f"转账金额：{format_decimal(transfer_amount)} 金币\n"
+        f"你的剩余金币：{format_decimal(updated_sender.coins)}\n"
+        f"对方当前金币：{format_decimal(updated_receiver.coins)}"
+    )
+
+
 @slot_query.handle()
 async def handle_slot_query(event: MessageEvent) -> None:
     account = event.get_user_id()
@@ -220,6 +270,19 @@ async def handle_slot_machine(event: MessageEvent) -> None:
             f"当前金币：{format_decimal(user.coins)}\n"
             f"本次需要：{format_decimal(bet_config.total_bet)}"
         )
+
+    allowed_probability = calculate_allowed_win_probability(
+        user.coins,
+        user.win_count,
+        user.total_payout,
+    )
+    logger.info(
+        f"老虎机抽奖概率 | 账号：{account} | "
+        f"金币：{format_decimal(user.coins)} | "
+        f"中奖次数：{user.win_count} | "
+        f"累计获得：{format_decimal(user.total_payout)} | "
+        f"本次概率：{allowed_probability:.2%}"
+    )
 
     spin_result = resolve_controlled_spin(
         bet_config,

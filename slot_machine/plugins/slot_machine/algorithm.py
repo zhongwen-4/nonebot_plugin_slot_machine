@@ -193,12 +193,11 @@ def find_matches(board: list[list[str]]) -> list[WinMatch]:
             hit_positions.append(column_hit)
 
         if matched_columns >= 3:  # noqa: PLR2004
-            payout_columns = min(matched_columns, max(PAYOUT_TABLE[symbol]))
             matches.append(
                 WinMatch(
                     symbol=symbol,
                     columns=matched_columns,
-                    payout_points=PAYOUT_TABLE[symbol][payout_columns],
+                    payout_points=PAYOUT_TABLE[symbol][matched_columns],
                     hit_positions=tuple(hit_positions),
                 )
             )
@@ -365,6 +364,7 @@ def resolve_free_spins(bet_config: BetConfig, free_spin_count: int) -> SpinResul
     total_payout = Decimal(0)
     total_awarded_free_spins = 0
     free_spin_index = 1
+    final_board = generate_losing_board()
 
     while free_spin_index <= free_spin_count:
         free_spin_result = resolve_spin_from_board(
@@ -381,7 +381,7 @@ def resolve_free_spins(bet_config: BetConfig, free_spin_count: int) -> SpinResul
         free_spin_index += 1
 
     return SpinResult(
-        final_board=final_board if free_spin_count else generate_losing_board(),
+        final_board=final_board,
         cascades=tuple(cascades),
         total_payout=total_payout,
         awarded_free_spins=total_awarded_free_spins,
@@ -431,7 +431,7 @@ def calculate_allowed_win_probability(
     elif user_coins >= Decimal(100):
         base_probability = 0.4
     else:
-        base_probability = 0.35
+        base_probability = 0.5
 
     win_penalty = 0.82 ** min(win_count, 30)
     payout_ratio = min(float(total_user_payout / Decimal(2000)), 0.95)

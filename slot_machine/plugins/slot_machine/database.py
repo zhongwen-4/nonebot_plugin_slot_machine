@@ -176,3 +176,130 @@ async def apply_spin_result(
         win_count=user.win_count + win_increment,
         total_payout=updated_total_payout,
     )
+
+
+async def add_user_coins(account: str, amount: Decimal) -> UserData:
+    user = await get_user(account)
+    if user is None:
+        msg = "user not registered"
+        raise LookupError(msg)
+
+    final_coins = user.coins + amount
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute(
+            """
+            UPDATE slot_users
+            SET coins = ?
+            WHERE account = ?
+            """,
+            (str(final_coins), account),
+        )
+        await db.commit()
+
+    return UserData(
+        account=account,
+        coins=final_coins,
+        spin_count=user.spin_count,
+        win_count=user.win_count,
+        total_payout=user.total_payout,
+    )
+
+
+async def transfer_user_coins(
+    sender_account: str,
+    receiver_account: str,
+    amount: Decimal,
+) -> tuple[UserData, UserData]:
+    if amount <= 0:
+        msg = "transfer amount must be positive"
+        raise ValueError(msg)
+    if sender_account == receiver_account:
+        msg = "cannot transfer to self"
+        raise ValueError(msg)
+
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute("BEGIN IMMEDIATE")
+        try:
+            sender = await fetch_user_for_update(db, sender_account)
+            receiver = await fetch_user_for_update(db, receiver_account)
+            sender, receiver = ensure_transfer_users_exist(sender, receiver)
+            ensure_transfer_balance(sender, amount)
+
+            updated_sender = UserData(
+                account=sender.account,
+                coins=sender.coins - amount,
+                spin_count=sender.spin_count,
+                win_count=sender.win_count,
+                total_payout=sender.total_payout,
+            )
+            updated_receiver = UserData(
+                account=receiver.account,
+                coins=receiver.coins + amount,
+                spin_count=receiver.spin_count,
+                win_count=receiver.win_count,
+                total_payout=receiver.total_payout,
+            )
+            await db.execute(
+                """
+                UPDATE slot_users
+                SET coins = ?
+                WHERE account = ?
+                """,
+                (str(updated_sender.coins), updated_sender.account),
+            )
+            await db.execute(
+                """
+                UPDATE slot_users
+                SET coins = ?
+                WHERE account = ?
+                """,
+                (str(updated_receiver.coins), updated_receiver.account),
+            )
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
+
+    return updated_sender, updated_receiver
+
+
+def ensure_transfer_users_exist(
+    sender: UserData | None,
+    receiver: UserData | None,
+) -> tuple[UserData, UserData]:
+    if sender is None or receiver is None:
+        msg = "user not registered"
+        raise LookupError(msg)
+    return sender, receiver
+
+
+def ensure_transfer_balance(sender: UserData, amount: Decimal) -> None:
+    if sender.coins < amount:
+        msg = "insufficient coins"
+        raise ValueError(msg)
+
+
+async def fetch_user_for_update(
+    db: aiosqlite.Connection,
+    account: str,
+) -> UserData | None:
+    async with db.execute(
+        """
+        SELECT account, coins, spin_count, win_count, total_payout
+        FROM slot_users
+        WHERE account = ?
+        """,
+        (account,),
+    ) as cursor:
+        row = await cursor.fetchone()
+
+    if row is None:
+        return None
+
+    return UserData(
+        account=row[0],
+        coins=Decimal(row[1]),
+        spin_count=row[2],
+        win_count=row[3],
+        total_payout=Decimal(row[4]),
+    )
