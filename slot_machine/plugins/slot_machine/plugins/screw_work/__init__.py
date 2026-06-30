@@ -1,10 +1,9 @@
 ﻿from decimal import Decimal
 
-from nonebot import get_driver, on_command
-from nonebot.adapters.milky import Message
+from nonebot import get_driver, logger, on_command
 from nonebot.adapters.milky.event import MessageEvent
-from nonebot.params import CommandArg
 from nonebot.plugin import PluginMetadata
+from nonebot_plugin_alconna import Alconna, Args, CommandMeta, on_alconna
 
 from slot_machine.plugins.slot_machine.database import add_user_coins, get_user
 from slot_machine.plugins.slot_machine.utils import format_decimal
@@ -35,7 +34,14 @@ __plugin_meta__ = PluginMetadata(
     ),
 )
 
-start_screw_work = on_command("开始打螺丝", block=True)
+start_screw_work = on_alconna(
+    Alconna(
+        "开始打螺丝",
+        Args["first", str]["second?", str],
+        meta=CommandMeta(description="按分钟打螺丝并立即结算金币"),
+    ),
+    block=True,
+)
 stop_screw_work = on_command("停止打螺丝", block=True)
 screw_work_status = on_command("打螺丝状态", aliases={"螺丝状态"}, block=True)
 
@@ -61,14 +67,17 @@ async def settle_account(account: str) -> tuple[ScrewWorkState, Decimal, int]:
 @start_screw_work.handle()
 async def handle_start_screw_work(
     event: MessageEvent,
-    args: Message = CommandArg(),
+    first: str,
+    second: str = "",
 ) -> None:
     account = event.get_user_id()
     user = await get_user(account)
     if user is None:
         await start_screw_work.finish("你还没有注册。\n请先发送：注册老虎机")
 
-    selected_mode, work_minutes = parse_screw_work_args(args.extract_plain_text())
+    raw_args = " ".join(part for part in (first, second) if part)
+    logger.info(f"screw_work start args: {raw_args!r}")
+    selected_mode, work_minutes = parse_screw_work_args(raw_args)
     if selected_mode is None:
         await start_screw_work.finish(
             "未知打螺丝模式。\n"

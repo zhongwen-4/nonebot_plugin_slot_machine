@@ -31,15 +31,26 @@ def parse_screw_work_args(raw_args: str) -> tuple[ScrewWorkMode | None, int | No
     if not parts:
         return get_screw_work_modes()["普通"], None
 
-    if len(parts) == 1:
-        minutes = parse_work_minutes(parts[0])
-        if minutes is not None:
-            return get_screw_work_modes()["普通"], minutes
+    minute_index = next(
+        (
+            index
+            for index, part in enumerate(parts)
+            if parse_work_minutes(part) is not None
+        ),
+        None,
+    )
+    if minute_index is None:
         return parse_screw_work_mode(parts[0]), None
 
-    mode = parse_screw_work_mode(parts[0])
-    minutes = parse_work_minutes(parts[1])
-    return mode, minutes
+    minutes = parse_work_minutes(parts[minute_index])
+    mode_parts = [
+        part
+        for index, part in enumerate(parts)
+        if index != minute_index and part not in {"开始打螺丝", "打螺丝"}
+    ]
+    if not mode_parts:
+        return get_screw_work_modes()["普通"], minutes
+    return parse_screw_work_mode(mode_parts[-1]), minutes
 
 
 def parse_work_minutes(raw_minutes: str) -> int | None:
