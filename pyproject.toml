@@ -1,7 +1,7 @@
 [project]
-name = "slot_machine"
-version = "0.1.0"
-description = "slot_machine"
+name = "nonebot-plugin-slot-machine"
+version = "0.0.4"
+description = "NoneBot slot machine plugin"
 readme = "README.md"
 requires-python = ">=3.11, <4.0"
 dependencies = [
