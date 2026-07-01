@@ -5,7 +5,7 @@
 
 # nonebot-plugin-slot-machine
 
-_✨ NoneBot2 老虎/老虎机与打螺丝金币插件 ✨_
+_✨ NoneBot2 一个老虎机插件 ✨_
 
 <a href="https://github.com/zhongwen-4/nonebot_plugin_slot_machine/actions/workflows/publish.yml">
   <img src="https://img.shields.io/github/actions/workflow/status/zhongwen-4/nonebot_plugin_slot_machine/publish.yml?style=flat-square" alt="workflow">
