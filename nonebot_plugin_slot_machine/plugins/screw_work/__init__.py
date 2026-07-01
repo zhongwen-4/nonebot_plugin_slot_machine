@@ -24,13 +24,16 @@ from .utils import (
 )
 
 __plugin_meta__ = PluginMetadata(
-    name="screw_work",
+    name="打螺丝插件",
     description="打螺丝赚金币。",
     usage=(
         "开始打螺丝 <分钟>：按普通模式立即结算\n"
         "开始打螺丝 <普通/韭菜/牛马/卷王> <分钟>：按指定模式立即结算\n"
         "打螺丝状态：查看体力和工作状态"
     ),
+    homepage= "https://github.com/zhongwen-4/nonebot_plugin_slot_machine/tree/main/nonebot_plugin_slot_machine/plugins/screw_work",
+    type= "application",
+    supported_adapters= {"~milky"}
 )
 
 start_screw_work = on_alconna(
