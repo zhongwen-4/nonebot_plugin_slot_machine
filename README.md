@@ -26,17 +26,53 @@ _✨ NoneBot2 老虎/老虎机与打螺丝金币插件 ✨_
 
 ## 💿 安装
 
-使用 pip 安装：
+<details open>
+<summary>使用 nb-cli 安装</summary>
 
-```bash
-pip install nonebot-plugin-slot-machine
-```
+在 NoneBot2 项目的根目录下打开命令行，输入以下指令即可安装：
 
-使用 nb-cli 安装：
+    nb plugin install nonebot-plugin-slot-machine
 
-```bash
-nb plugin install nonebot-plugin-slot-machine
-```
+</details>
+
+<details>
+<summary>使用包管理器安装</summary>
+
+在 NoneBot2 项目的插件目录下打开命令行，根据你使用的包管理器输入相应的安装命令。
+
+<details>
+<summary>pip</summary>
+
+    pip install nonebot-plugin-slot-machine
+
+</details>
+
+<details>
+<summary>pdm</summary>
+
+    pdm add nonebot-plugin-slot-machine
+
+</details>
+
+<details>
+<summary>poetry</summary>
+
+    poetry add nonebot-plugin-slot-machine
+
+</details>
+
+<details>
+<summary>conda</summary>
+
+    conda install nonebot-plugin-slot-machine
+
+</details>
+
+打开 NoneBot2 项目根目录下的 `pyproject.toml` 文件，在 `[tool.nonebot]` 部分追加写入：
+
+    plugins = ["slot_machine.plugins.slot_machine"]
+
+</details>
 
 ## ⚙️ 配置
 
