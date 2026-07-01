@@ -1,6 +1,6 @@
 [project]
 name = "nonebot-plugin-slot-machine"
-version = "0.0.7"
+version = "0.0.8"
 description = "NoneBot slot machine plugin"
 readme = "README.md"
 requires-python = ">=3.11, <4.0"
@@ -18,10 +18,10 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["slot_machine*"]
+include = ["nonebot_plugin_slot_machine*"]
 
 [tool.setuptools.package-data]
-"slot_machine.plugins.slot_machine" = ["image/*.png"]
+"nonebot_plugin_slot_machine" = ["image/*.png"]
 
 [project.optional-dependencies]
 dev = [
@@ -30,7 +30,6 @@ dev = [
 ]
 
 [tool.nonebot]
-plugin_dirs = ["slot_machine/plugins"]
 builtin_plugins = []
 
 [tool.nonebot.adapters]
@@ -40,7 +39,7 @@ nonebot-adapter-milky = [
 "@local" = []
 
 [tool.nonebot.plugins]
-"@local" = []
+"@local" = ["nonebot_plugin_slot_machine"]
 nonebot-plugin-alconna = ["nonebot_plugin_alconna"]
 [tool.ruff]
 line-length = 88

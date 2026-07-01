@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import aiosqlite
 
-from slot_machine.plugins.slot_machine.constants import DATABASE_PATH
+from nonebot_plugin_slot_machine.constants import DATABASE_PATH
 
 
 @dataclass(frozen=True)

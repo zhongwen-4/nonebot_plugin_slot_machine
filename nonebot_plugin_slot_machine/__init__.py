@@ -1,14 +1,18 @@
-import asyncio
+import asyncio, nonebot
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
 
-from nonebot import get_driver, require, logger, on_command
+from nonebot import get_driver, logger, on_command, require
 
 require("nonebot_plugin_alconna")
 from nonebot.adapters.milky import MessageSegment
 from nonebot.adapters.milky.event import MessageEvent
 from nonebot.plugin import PluginMetadata
+from pathlib import Path
 from nonebot_plugin_alconna import Alconna, Args, CommandMeta, on_alconna
+
+sub_plugins = nonebot.load_plugins(
+    str(Path(__file__).parent.joinpath("plugins").resolve())
+)
 
 from .algorithm import (
     BetConfigError,

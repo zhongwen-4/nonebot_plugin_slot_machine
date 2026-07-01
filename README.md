@@ -71,9 +71,9 @@ _✨ NoneBot2 老虎/老虎机与打螺丝金币插件 ✨_
 
 </details>
 
-打开 NoneBot2 项目根目录下的 `pyproject.toml` 文件，在 `[tool.nonebot]` 部分追加写入：
+打开 NoneBot2 项目根目录下的 `pyproject.toml` 文件，在 `[tool.nonebot.plugins]` 部分追加写入：
 
-    plugins = ["slot_machine.plugins.slot_machine"]
+    "@local" = ["nonebot_plugin_slot_machine"]
 
 </details>
 
@@ -92,15 +92,10 @@ pip install nonebot-adapter-milky
 在 NoneBot 项目中加载插件：
 
 ```python
-nonebot.load_plugin("slot_machine.plugins.slot_machine")
+nonebot.load_plugin("nonebot_plugin_slot_machine")
 ```
 
-如果使用 `pyproject.toml` 的本地插件目录加载，请确保插件目录包含：
-
-```toml
-[tool.nonebot]
-plugin_dirs = ["slot_machine/plugins"]
-```
+如果使用 `pyproject.toml` 加载插件，请在 `[tool.nonebot.plugins]` 中加入 `@local = ["nonebot_plugin_slot_machine"]`。
 
 ### 指令
 

@@ -5,8 +5,8 @@ from nonebot.adapters.milky.event import MessageEvent
 from nonebot.plugin import PluginMetadata
 from nonebot_plugin_alconna import Alconna, Args, CommandMeta, on_alconna
 
-from slot_machine.plugins.slot_machine.database import add_user_coins, get_user
-from slot_machine.plugins.slot_machine.utils import format_decimal
+from nonebot_plugin_slot_machine.database import add_user_coins, get_user
+from nonebot_plugin_slot_machine.utils import format_decimal
 
 from .database import (
     ScrewWorkState,
