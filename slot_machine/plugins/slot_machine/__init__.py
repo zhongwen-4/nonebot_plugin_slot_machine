@@ -2,7 +2,9 @@ import asyncio
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from nonebot import get_driver, load_plugins, logger, on_command
+from nonebot import get_driver, require, logger, on_command
+
+require("nonebot_plugin_alconna")
 from nonebot.adapters.milky import MessageSegment
 from nonebot.adapters.milky.event import MessageEvent
 from nonebot.plugin import PluginMetadata
@@ -43,9 +45,10 @@ __plugin_meta__ = PluginMetadata(
         "查询老虎机/查询：查看账号和投注信息\n"
         "开始旋转：开始抽奖"
     ),
+    supported_adapters={"~milky"},
+    type="application",
+    homepage="https://github.com/zhongwen-4/nonebot_plugin_slot_machine"
 )
-
-load_plugins(str(Path(__file__).parent / "plugins"))
 
 slot_register = on_command(
     "注册老虎机",
