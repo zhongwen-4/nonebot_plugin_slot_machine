@@ -43,6 +43,7 @@ start_screw_work = on_alconna(
         meta=CommandMeta(description="按分钟打螺丝并立即结算金币"),
     ),
     block=True,
+    use_cmd_start= True
 )
 screw_work_status = on_command("打螺丝状态", aliases={"螺丝状态"}, block=True)
 

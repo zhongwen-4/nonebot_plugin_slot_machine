@@ -64,6 +64,7 @@ slot_setting = on_alconna(
     ),
     aliases={"setslot"},
     block=True,
+    use_cmd_start=True
 )
 slot_transfer = on_alconna(
     Alconna(
@@ -72,6 +73,7 @@ slot_transfer = on_alconna(
         meta=CommandMeta(description="向其他老虎机账号转账金币"),
     ),
     block=True,
+    use_cmd_start= True
 )
 slot_query = on_command(
     "查询老虎机",
