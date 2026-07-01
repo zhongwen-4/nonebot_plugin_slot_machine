@@ -38,7 +38,7 @@ from .utils import (
 )
 
 __plugin_meta__ = PluginMetadata(
-    name="slot_machine",
+    name="老虎机",
     description="一个老虎机游戏插件",
     usage=(
         "注册老虎机/注册：领取初始金币\n"
