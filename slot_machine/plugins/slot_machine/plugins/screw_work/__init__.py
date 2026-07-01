@@ -29,7 +29,6 @@ __plugin_meta__ = PluginMetadata(
     usage=(
         "开始打螺丝 <分钟>：按普通模式立即结算\n"
         "开始打螺丝 <普通/韭菜/牛马/卷王> <分钟>：按指定模式立即结算\n"
-        "停止打螺丝：停止工作并结算金币\n"
         "打螺丝状态：查看体力和工作状态"
     ),
 )
@@ -42,7 +41,6 @@ start_screw_work = on_alconna(
     ),
     block=True,
 )
-stop_screw_work = on_command("停止打螺丝", block=True)
 screw_work_status = on_command("打螺丝状态", aliases={"螺丝状态"}, block=True)
 
 
@@ -125,37 +123,6 @@ async def handle_start_screw_work(
         f"获得金币：{format_decimal(instant_coins)}\n"
         f"恢复结算：{earned_minutes} 分钟，获得 {format_decimal(earned_coins)} 金币\n"
         f"当前体力：{final_state.stamina}/100\n"
-        f"当前金币：{format_decimal(updated_user.coins)}"
-    )
-
-
-@stop_screw_work.handle()
-async def handle_stop_screw_work(event: MessageEvent) -> None:
-    account = event.get_user_id()
-    user = await get_user(account)
-    if user is None:
-        await stop_screw_work.finish("你还没有注册。\n请先发送：注册老虎机")
-
-    state, earned_coins, earned_minutes = await settle_account(account)
-    await save_screw_work_state(
-        ScrewWorkState(
-            account=account,
-            stamina=state.stamina,
-            updated_at=now_timestamp(),
-            started_at=None,
-            mode=state.mode,
-        )
-    )
-    updated_user = await get_user(account)
-    if updated_user is None:
-        await stop_screw_work.finish("账号数据异常，请稍后再试。")
-        return
-    await stop_screw_work.finish(
-        "已停止打螺丝。\n"
-        f"模式：{state.mode}\n"
-        f"本次结算：{earned_minutes} 分钟\n"
-        f"获得金币：{format_decimal(earned_coins)}\n"
-        f"当前体力：{state.stamina}/100\n"
         f"当前金币：{format_decimal(updated_user.coins)}"
     )
 
