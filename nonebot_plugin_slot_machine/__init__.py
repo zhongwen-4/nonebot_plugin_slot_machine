@@ -9,6 +9,7 @@ from nonebot.adapters.milky.event import MessageEvent
 from nonebot.plugin import PluginMetadata
 from nonebot_plugin_alconna import Alconna, Args, CommandMeta, on_alconna
 
+load_plugin("nonebot_plugin_slot_machine.plugins.risk_control")
 load_plugin("nonebot_plugin_slot_machine.plugins.screw_work")
 
 from .algorithm import (
@@ -28,6 +29,10 @@ from .database import (
     register_user,
     transfer_user_coins,
     upsert_bet_setting,
+)
+from .plugins.risk_control.utils import (
+    get_suspension_message,
+    record_and_check_transfer_risk,
 )
 from .utils import (
     GeneratedSpinImage,
@@ -194,6 +199,10 @@ async def handle_slot_transfer(
     amount: str,
 ) -> None:
     sender_account = event.get_user_id()
+    suspension_message = await get_suspension_message(sender_account)
+    if suspension_message is not None:
+        await slot_transfer.finish(suspension_message)
+
     sender = await get_user(sender_account)
     if sender is None:
         await slot_transfer.finish("你还没有注册。\n请先发送：注册老虎机")
@@ -225,12 +234,23 @@ async def handle_slot_transfer(
         receiver_account,
         transfer_amount,
     )
+    risk_decision = await record_and_check_transfer_risk(
+        sender_account,
+        receiver_account,
+        transfer_amount,
+    )
+    risk_text = (
+        f"\n\n风控提示：{risk_decision.reason}，相关账号已封号一天。"
+        if risk_decision is not None
+        else ""
+    )
     await slot_transfer.finish(
         "转账成功。\n"
         f"收款账号：{receiver_account}\n"
         f"转账金额：{format_decimal(transfer_amount)} 金币\n"
         f"你的剩余金币：{format_decimal(updated_sender.coins)}\n"
         f"对方当前金币：{format_decimal(updated_receiver.coins)}"
+        f"{risk_text}"
     )
 
 
@@ -279,13 +299,18 @@ async def handle_slot_rule() -> None:
         "G、H=8/15/30/50。\n"
         "8. 打螺丝：发送“开始打螺丝 <分钟>”或“开始打螺丝 <模式> <分钟>”。\n"
         "   普通/韭菜/牛马/卷王分别每分钟获得 10/20/30/40 金币，"
-        "消耗 1/5/10/15 体力。体力上限 100，每 30 秒恢复 1 点。"
+        "消耗 1/5/10/15 体力。体力上限 100，每 30 秒恢复 1 点。\n"
+        "9. 风控：短时间大量转账或多个账号集中汇款会导致相关账号封号一天。"
     )
 
 
 @slot_machine.handle()
 async def handle_slot_machine(event: MessageEvent) -> None:
     account = event.get_user_id()
+    suspension_message = await get_suspension_message(account)
+    if suspension_message is not None:
+        await slot_machine.finish(suspension_message)
+
     user = await get_user(account)
 
     if user is None:

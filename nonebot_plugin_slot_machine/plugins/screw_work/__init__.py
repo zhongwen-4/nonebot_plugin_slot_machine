@@ -6,6 +6,9 @@ from nonebot.plugin import PluginMetadata
 from nonebot_plugin_alconna import Alconna, Args, CommandMeta, on_alconna
 
 from nonebot_plugin_slot_machine.database import add_user_coins, get_user
+from nonebot_plugin_slot_machine.plugins.risk_control.utils import (
+    get_suspension_message,
+)
 from nonebot_plugin_slot_machine.utils import format_decimal
 
 from .database import (
@@ -73,6 +76,10 @@ async def handle_start_screw_work(
     second: str = "",
 ) -> None:
     account = event.get_user_id()
+    suspension_message = await get_suspension_message(account)
+    if suspension_message is not None:
+        await start_screw_work.finish(suspension_message)
+
     user = await get_user(account)
     if user is None:
         await start_screw_work.finish("你还没有注册。\n请先发送：注册老虎机")
