@@ -7,6 +7,7 @@ require("nonebot_plugin_alconna")
 from nonebot.adapters.milky import MessageSegment
 from nonebot.adapters.milky.event import MessageEvent
 from nonebot.plugin import PluginMetadata
+from nonebot.typing import T_State
 from nonebot_plugin_alconna import Alconna, Args, CommandMeta, on_alconna
 
 load_plugin("nonebot_plugin_slot_machine.plugins.risk_control")
@@ -195,6 +196,7 @@ async def handle_slot_setting(
 @slot_transfer.handle()
 async def handle_slot_transfer(
     event: MessageEvent,
+    state: T_State,
     receiver_account: str,
     amount: str,
 ) -> None:
@@ -221,6 +223,43 @@ async def handle_slot_transfer(
 
     if sender_account == receiver_account:
         await slot_transfer.finish("不能给自己转账。")
+
+    if sender.coins < transfer_amount:
+        await slot_transfer.finish(
+            "金币不足，无法转账。\n"
+            f"当前金币：{format_decimal(sender.coins)}\n"
+            f"转账金额：{format_decimal(transfer_amount)}"
+        )
+
+    state["receiver_account"] = receiver_account
+    state["transfer_amount"] = transfer_amount
+    await slot_transfer.pause(
+        f"你确定要给{receiver_account}转账{format_decimal(transfer_amount)}个金币吗？\n"
+        "发送“确认”继续，发送其他内容取消。"
+    )
+
+
+@slot_transfer.handle()
+async def handle_slot_transfer_confirm(event: MessageEvent, state: T_State) -> None:
+    confirm_text = event.get_plaintext().strip().lower()
+    if confirm_text not in {"确认", "确定", "是", "y", "yes"}:
+        await slot_transfer.finish("已取消转账。")
+
+    sender_account = event.get_user_id()
+    receiver_account = state["receiver_account"]
+    transfer_amount = state["transfer_amount"]
+
+    suspension_message = await get_suspension_message(sender_account)
+    if suspension_message is not None:
+        await slot_transfer.finish(suspension_message)
+
+    sender = await get_user(sender_account)
+    if sender is None:
+        await slot_transfer.finish("你还没有注册。\n请先发送：注册老虎机")
+
+    receiver = await get_user(receiver_account)
+    if receiver is None:
+        await slot_transfer.finish("对方还没有注册老虎机账号。")
 
     if sender.coins < transfer_amount:
         await slot_transfer.finish(
